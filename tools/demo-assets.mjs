@@ -26,7 +26,11 @@ out('qr-demo.svg', toSvg(page, { scale: 6, quiet: 4 }));
 //    one URL, encoded as itself and as a squrl link. The prefix here is a
 //    five-character host, which is the kind you would register for this --
 //    the README says so next to the picture.
-const SAMPLE = 'https://www.ozon.ru/product/naushniki-sony-wh-1000xm5-9876543210/?utm_source=yandex&utm_medium=cpc&utm_campaign=autumn';
+//
+//    A percent-encoded URL, because that is the case with the most to gain and
+//    the README says that too: three characters per byte in the original, and
+//    squrl decodes the escapes back to bytes before coding them.
+const SAMPLE = 'https://ru.wikipedia.org/wiki/%D0%9A%D0%BE%D0%B4_%D0%A5%D0%B0%D1%84%D1%84%D0%BC%D0%B0%D0%BD%D0%B0';
 const link = shorten(SAMPLE, { base: 'https://sq.gy/' }).link.toUpperCase();
 
 const before = encode(SAMPLE, { level: 'L' });

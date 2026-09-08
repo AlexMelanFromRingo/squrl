@@ -393,9 +393,10 @@
 </div>
 
 <script type="module">
-import { shorten, DEFAULT_BASE } from './src/codec.js';
+import { shorten, expand, DEFAULT_BASE } from './src/codec.js';
 import { encode, toSvg } from './src/qr.js';
 import { strip } from './src/tracking.js';
+import { CANARY } from './src/canary.js';
 
 // A link can also carry its payload in the fragment -- `sq.gy/#PAYLOAD` --
 // which is never sent to the server at all. Static hosting answers that with
@@ -419,6 +420,12 @@ if (/^[0-9a-zA-Z]+$/.test(fragment)) {
       `<p>Cannot decode that link: ${err.message.replace(/[&<>"]/g, '')}</p>`;
   }
 }
+
+// The tables in src/prior.js are part of the wire format, and a browser that
+// cached half of an older deployment will happily produce links this page
+// cannot read back. Check that first: a compressor that is quietly wrong is
+// worse than one that is unavailable.
+const stale = expand(CANARY.payload) !== CANARY.url;
 
 const input = document.querySelector('#url');
 const hashMode = document.querySelector('#hash');
@@ -511,6 +518,15 @@ function drawRuler(cost) {
 function render() {
   const raw = input.value.trim();
   errorEl.hidden = true;
+
+  if (stale) {
+    reset('Nothing measured yet.');
+    errorEl.hidden = false;
+    errorEl.textContent = 'This page is out of date: its decoder does not match '
+      + 'the tables it was built with. Reload it with Ctrl+Shift+R (Cmd+Shift+R '
+      + 'on a Mac).';
+    return;
+  }
 
   if (!raw) {
     reset('Nothing measured yet.');

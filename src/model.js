@@ -26,7 +26,7 @@ import {
 } from './dict.js';
 import { split, join, isNumber, isHex, hexBytes, hexString } from './parse.js';
 
-export const VERSION = 1;
+export const VERSION = 2;
 
 // The version is two bits, and 3 is not a version: it means "a number
 // follows". Formats that run out of room for a version number are how old
@@ -34,20 +34,25 @@ export const VERSION = 1;
 const VERSION_ESCAPE = 3;
 
 /**
- * Fixed probabilities for the version field, never trained and never changed.
+ * Fixed probabilities for the version field: even odds, never trained, never
+ * changed.
  *
  * A range-coded stream is only readable by a decoder holding the same
  * probabilities, so a version field priced by the trained prior is worthless
- * for its one job: the moment the prior changes, an old payload's version bits
- * decode to something else and the stream is misread rather than refused.
+ * for its one job -- the moment the prior moves, an old payload's version bits
+ * decode to some other number and the stream is misread rather than refused.
  *
- * These two numbers are therefore frozen. They cost the current version about a
- * third of a bit and every other version a few, which is the right way round.
- * A future format that changes VERSION must leave this table alone.
+ * Even odds rather than a skew towards the current version, which was the first
+ * attempt: a skew has to be re-aimed every time VERSION changes, and re-aiming
+ * it breaks exactly the cross-generation reading it exists to provide. (It also
+ * charged version 2 eleven bits for the privilege of not being version 1.) Two
+ * bits, the same for every version, in every generation. A future format may
+ * change VERSION but must leave this table alone.
  */
 export const VERSION_MODEL = [
-  [1, 82],      // first bit: versions 0 and 1 live in the low half
-  [2, 4014],    // second bit: 1 is the current version
+  [1, 2048],
+  [2, 2048],
+  [3, 2048],
 ];
 
 function putVersion(enc, version) {

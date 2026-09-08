@@ -15,16 +15,18 @@
 
 <table align="center">
 <tr>
-  <td align="center"><img src="docs/qr-before.svg" width="200" alt="QR code of the URL itself, 41 by 41 modules"></td>
-  <td align="center"><img src="docs/qr-after.svg" width="200" alt="QR code of the same URL compressed, 29 by 29 modules"></td>
+  <td align="center"><img src="docs/qr-before.svg" width="200" alt="QR code of the URL itself, 37 by 37 modules"></td>
+  <td align="center"><img src="docs/qr-after.svg" width="200" alt="QR code of the same URL compressed, 25 by 25 modules"></td>
 </tr>
 <tr>
-  <td align="center"><sub>the URL<br><b>118 characters &middot; 41&times;41</b></sub></td>
-  <td align="center"><sub>the same URL, compressed<br><b>77 characters &middot; 29&times;29</b></sub></td>
+  <td align="center"><sub>a Wikipedia article in Russian<br><b>97 characters &middot; 37&times;37</b></sub></td>
+  <td align="center"><sub>the same address, compressed<br><b>42 characters &middot; 25&times;25</b></sub></td>
 </tr>
 </table>
 
-<p align="center"><sub>Same destination, half the modules. Both codes were drawn by this repository.</sub></p>
+<p align="center"><sub>Same destination, 46% of the modules — and this is the best case, not the average:
+percent-encoded text spends three characters per byte, and squrl decodes it back to bytes before coding it.
+The averages are further down. Both codes were drawn by this repository.</sub></p>
 
 ---
 
@@ -44,9 +46,9 @@ git clone https://github.com/AlexMelanFromRingo/squrl
 cd squrl && npm link          # nothing to install: dependencies is {}
 
 squrl 'https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=42s'
-# https://sq.gy/3CS58RR0A5YLN9DGTVBMDDQ0M
+# https://sq.gy/4L00X3E7Y4ZTS68R8XIA262K1
 
-squrl expand https://sq.gy/3CS58RR0A5YLN9DGTVBMDDQ0M
+squrl expand https://sq.gy/4L00X3E7Y4ZTS68R8XIA262K1
 # https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=42s
 
 squrl qr 'https://example.com/some/page'     # draws it in the terminal
@@ -86,7 +88,7 @@ https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=42s
   --------- -----------
   total      124.6 bits  -> 16 bytes
 
-  link  https://sq.gy/3CS58RR0A5YLN9DGTVBMDDQ0M
+  link  https://sq.gy/4L00X3E7Y4ZTS68R8XIA262K1
         39 characters, 20% shorter
 ```
 
@@ -133,8 +135,8 @@ wrangler deploy server/worker.js   # or any edge runtime — there is no I/O to 
 ```
 
 ```
-GET /3CS58RR0A5YLN9DGTVBMDDQ0M            301, Location: the original URL
-GET /3CS58RR0A5YLN9DGTVBMDDQ0M?preview    a page showing where it goes
+GET /4L00X3E7Y4ZTS68R8XIA262K1            301, Location: the original URL
+GET /4L00X3E7Y4ZTS68R8XIA262K1?preview    a page showing where it goes
 GET /health                               ok
 ```
 
@@ -149,23 +151,23 @@ URL and always will.
 
 |  | original | compressed |  |
 |---|---:|---:|---:|
-| characters | 4093 | 3454 | **84%** |
-| payload bytes | 4093 | 1549 | **38%** |
+| characters | 4093 | 3479 | **85%** |
+| payload bytes | 4093 | 1566 | **38%** |
 | QR modules | 72850 | 54122 | **74%** |
 
 62 of 74 links came out shorter as text. 65 needed a smaller QR version, 9 came
 out the same size, none got bigger.
 
-Those two numbers — 38% and 84% — are the honest shape of the thing. The
-*compression* is better than two and a half to one. The *link* is only 16%
+Those two numbers — 38% and 85% — are the honest shape of the thing. The
+*compression* is better than two and a half to one. The *link* is only 15%
 shorter, because
 `https://sq.gy/` is fourteen characters of overhead and base36 costs 1.55
 characters per byte. On short URLs that eats the entire win:
 
 | original URL | count | characters | QR modules |
 |---|---:|---:|---:|
-| under 40 chars | 16 | 92% | 81% |
-| 40–60 chars | 28 | 88% | 75% |
+| under 40 chars | 16 | 93% | 81% |
+| 40–60 chars | 28 | 89% | 75% |
 | 60–90 chars | 28 | 83% | 73% |
 | over 90 chars | 2 | 56% | 56% |
 
@@ -177,7 +179,7 @@ paste at each other:
 |---|---:|---:|---|
 | `https://www.youtube.com/watch?v=kJQP7kiw5Fk&t=90s` | 49 | 39 | v3 29² byte → v2 25² alnum |
 | `https://ru.wikipedia.org/wiki/%D0%9A%D0%BE%D0%B4_…` | 97 | 42 | v5 37² byte → v2 25² alnum |
-| `https://tracker.example.net/c?utm_source=facebook…` | 126 | 83 | v6 41² byte → v4 33² alnum |
+| `https://tracker.example.net/c?utm_source=facebook…` | 126 | 82 | v6 41² byte → v4 33² alnum |
 
 The Cyrillic one is the clearest case: percent-encoded UTF-8 spends three
 characters per byte, and squrl decodes it back to bytes before coding it. 97
@@ -272,16 +274,16 @@ The single biggest win available is not compression:
 
 ```console
 $ squrl 'https://www.ozon.ru/product/…-9876543210/?utm_source=yandex&utm_medium=cpc&utm_campaign=autumn'
-https://sq.gy/KDX5AEVFVX4EZZ29B751JVX6D7T36ZTZXI0XEP0F6C2GN3RE2PD0YZEFMJSLRHT
-118 chars -> 77 (41 bytes of payload, -41 chars)
+https://sq.gy/1CJNIZTHBJBD6T6SFMNRFALJ88DF5EUMRXARO5DA4891087O79Z07YQODF2161FP
+118 chars -> 78 (41 bytes of payload, -40 chars)
 
 $ squrl --strip-tracking 'https://www.ozon.ru/product/…-9876543210/?utm_source=yandex&utm_medium=cpc&utm_campaign=autumn'
 dropped 3 tracking parameter(s): utm_source=yandex utm_medium=cpc utm_campaign=autumn
-https://sq.gy/DFPCBDEW4RIKV4TJH9YQS0F6XR2RETAPK0IMZCXHBRT
-65 chars -> 57 (28 bytes of payload, -8 chars)
+https://sq.gy/6BIQQAF4HKKTDXN3M9O7TZ9P6TWP9BR2S9VH4GN74BSM5
+65 chars -> 59 (29 bytes of payload, -6 chars)
 ```
 
-Three campaign parameters were 53 of that URL's 118 characters, and 13 of the 41
+Three campaign parameters were 53 of that URL's 118 characters, and 12 of the 41
 bytes they compressed to. Dropping them is **off by default and always
 announced**, because it changes the URL — the one place squrl will do that.
 
@@ -296,14 +298,28 @@ retrain on your own corpus:
 - so bump `VERSION` in `src/model.js`, and keep the old tables if you need both.
 
 The format leaves room for that: the version is two bits, where `3` means "a
-number follows", so there is no cliff at version four. The current version is 1.
+number follows", so there is no cliff at version four. The current version is 2.
 
-The version field is the one place with **frozen** probabilities, never trained
-and never changed. That is not a detail: a range-coded stream is unreadable
-without the numbers that wrote it, so a version field priced by the trained
-prior would decode to garbage the moment the prior moved — identifying nothing.
-Held fixed, it costs the current version six hundredths of a bit and lets any
-decoder say `unsupported format version 0` instead of returning the wrong URL.
+Two things enforce the rule rather than merely stating it.
+
+**The version field has frozen probabilities** — even odds, never trained,
+never changed. A range-coded stream is unreadable without the numbers that
+wrote it, so a version field priced by the trained prior would decode to
+something else the moment the prior moved, identifying nothing. Even odds costs
+every payload exactly two bits and lets a decoder of any generation say
+`unsupported format version 1` instead of returning a plausible wrong address.
+(The first attempt skewed those odds towards the current version to make it
+nearly free. It then charged version 2 eleven bits for not being version 1, and
+would have needed re-aiming — which is precisely the thing that breaks
+cross-generation reading.)
+
+**A canary payload ships with the tables.** `src/canary.js` holds one payload
+and the URL it must decode to. The test suite checks it, so a retraining that
+forgot to bump `VERSION` fails loudly; the two static pages check it at load,
+so a browser holding half of last week's modules says *this page is out of
+date* instead of quietly producing links nobody else can read. That failure is
+not hypothetical — it is what happened the first time this was deployed twice
+in ten minutes.
 
 Two more things worth saying plainly. A payload is **not encrypted** — anyone
 holding this library can read it, and that is the point. And whoever hosts the
@@ -314,7 +330,7 @@ dependency-free files you can run yourself.
 ## Tests
 
 ```bash
-npm test        # 71 tests, node:test, no framework
+npm test        # 74 tests, node:test, no framework
 ```
 
 The ones that matter are the round trips: every URL in the corpus, every URL in

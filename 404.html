@@ -75,8 +75,8 @@
 //
 // The payload can arrive two ways:
 //
-//   /3FW1PKGIWMQCIJRGQTZ697DAN   in the path; the host sees it in the request
-//   #3FW1PKGIWMQCIJRGQTZ697DAN   in the fragment, which is never sent at all
+//   /GN7QNJXN40QUBS6J1K0ZUNKN6   in the path; the host sees it in the request
+//   #GN7QNJXN40QUBS6J1K0ZUNKN6   in the fragment, which is never sent at all
 //
 // The fragment form is the private one. It costs a bigger QR code, because
 // `#` is not in the character set QR codes have a cheap mode for.
@@ -119,10 +119,22 @@ if (!payload) {
   footnote(`<a href="${root}">Compress a link instead</a>`);
 } else {
   try {
-    const [{ expand }, { followable }] = await Promise.all([
+    const [{ expand }, { followable }, { CANARY }] = await Promise.all([
       import(new URL('src/codec.js', root).href),
       import(new URL('src/safe.js', root).href),
+      import(new URL('src/canary.js', root).href),
     ]);
+
+    // A browser can hold half of last week's modules and all of this week's,
+    // and a decoder with mismatched tables does not fail -- it returns a
+    // different URL. So before trusting it with anyone's link, make it decode
+    // a payload whose answer is known.
+    if (expand(CANARY.payload) !== CANARY.url) {
+      show('This page is out of date',
+        message('Reload it (Ctrl+Shift+R, or Cmd+Shift+R) and try the link again.'), true);
+      footnote('Its decoder does not match the one that made this link.');
+      throw new Error('stale');
+    }
 
     const target = expand(payload);
 
@@ -143,9 +155,11 @@ if (!payload) {
       location.replace(target);
     }
   } catch (err) {
-    show('Cannot decode that link', message(err.message), true);
-    footnote(`It may be a typo, or made with a different version of the format.
-      <a href="${root}">Compress a link instead</a>`);
+    if (err.message !== 'stale') {
+      show('Cannot decode that link', message(err.message), true);
+      footnote(`It may be a typo, or made with a different version of the format.
+        <a href="${root}">Compress a link instead</a>`);
+    }
   }
 }
 </script>

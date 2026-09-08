@@ -191,6 +191,48 @@ export function getTree(dec, base, bits) {
 /** Slots a bit tree of this width needs. */
 export const treeSize = (bits) => 1 << bits;
 
+/**
+ * A value in [0, n), by binary search over the interval.
+ *
+ * A fixed-width tree would round every symbol up to a whole number of bits:
+ * one of 38 alphabet letters would cost six, not 5.25. Splitting the interval
+ * instead asks only questions that can still tell the remaining values apart,
+ * so the average lands on log2(n) even when n is not a power of two -- which
+ * is the entire reason a narrow alphabet is worth choosing.
+ */
+export function putBounded(enc, base, n, value) {
+  let lo = 0;
+  let hi = n;
+  let ctx = 1;
+
+  while (hi - lo > 1) {
+    const mid = (lo + hi) >> 1;
+    const bit = value >= mid ? 1 : 0;
+    enc.bit(base + ctx, bit);
+    ctx = ctx * 2 + bit;
+    if (bit) lo = mid;
+    else hi = mid;
+  }
+}
+
+export function getBounded(dec, base, n) {
+  let lo = 0;
+  let hi = n;
+  let ctx = 1;
+
+  while (hi - lo > 1) {
+    const mid = (lo + hi) >> 1;
+    const bit = dec.bit(base + ctx);
+    ctx = ctx * 2 + bit;
+    if (bit) lo = mid;
+    else hi = mid;
+  }
+  return lo;
+}
+
+/** Slots a bounded coder over n values can touch. */
+export const boundedSize = (n) => 1 << Math.ceil(Math.log2(Math.max(2, n)));
+
 // Numbers of unknown size: the bit length first (as a small tree), then the
 // bits below the leading one. Small numbers stay small, and a 19-digit video
 // id still fits in eight bytes instead of nineteen.

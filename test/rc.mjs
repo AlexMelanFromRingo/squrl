@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 
 import {
   Models, Encoder, Decoder, ONE,
-  putTree, getTree, putUint, getUint, UINT_SLOTS, treeSize,
+  putTree, getTree, putUint, getUint, putBounded, getBounded, boundedSize,
+  UINT_SLOTS, treeSize,
 } from '../src/rc.js';
 
 const SLOTS = 4096;
@@ -106,4 +107,29 @@ test('numbers survive from zero to the largest a double counts', () => {
 
   const dec = new Decoder(Models.uniform(UINT_SLOTS), enc.finish());
   for (const value of values) assert.equal(getUint(dec, 0), value);
+});
+
+test('bounded values round trip, at any size', () => {
+  for (const n of [2, 3, 7, 12, 28, 38, 54, 64, 100, 255]) {
+    const enc = new Encoder(Models.uniform(boundedSize(n)));
+    for (let v = 0; v < n; v++) putBounded(enc, 0, n, v);
+
+    const dec = new Decoder(Models.uniform(boundedSize(n)), enc.finish());
+    for (let v = 0; v < n; v++) {
+      assert.equal(getBounded(dec, 0, n), v, `n=${n}`);
+    }
+  }
+});
+
+test('a bounded value costs log2(n), not the power of two above it', () => {
+  // This is the whole reason a 38-character alphabet is worth choosing: a
+  // fixed-width tree would round every symbol up to six bits.
+  for (const n of [12, 28, 38, 54]) {
+    const enc = new Encoder(Models.uniform(boundedSize(n)));
+    for (let v = 0; v < n; v++) putBounded(enc, 0, n, v);
+
+    const perValue = enc.total / n;
+    assert.ok(perValue < Math.log2(n) + 0.15,
+      `n=${n} cost ${perValue.toFixed(3)} bits, log2 is ${Math.log2(n).toFixed(3)}`);
+  }
 });

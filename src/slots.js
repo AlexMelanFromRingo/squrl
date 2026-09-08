@@ -5,14 +5,12 @@
 // Adding a field means adding a line -- and retraining, because the prior file
 // is a flat dump of exactly this many numbers in exactly this order.
 
-import { UINT_SLOTS, treeSize } from './rc.js';
+import { UINT_SLOTS, treeSize, boundedSize } from './rc.js';
 import { HOST_BITS, TLD_BITS, WORD_BITS, EXT_BITS } from './dict.js';
+import { ALPHABET_COUNT, ALPHABET_SLOTS } from './alphabet.js';
 
 export const SLOT = {};
 let next = 0;
-
-/** Contexts an identifier character is coded under: see segToken below. */
-export const TOKEN_CONTEXTS = 4;
 
 function alloc(name, count) {
   SLOT[name] = next;
@@ -45,10 +43,13 @@ alloc('segWord', treeSize(WORD_BITS));
 alloc('segNumber', UINT_SLOTS);
 alloc('segHexLength', UINT_SLOTS);
 alloc('segHex', treeSize(4));
-alloc('segTokenLength', UINT_SLOTS);
-// Four contexts -- start of run, after a letter, after a capital, after a
-// digit -- because identifiers cluster: "AbCd12" is unusual, "abcd12" is not.
-alloc('segToken', TOKEN_CONTEXTS * treeSize(6));
+// Which alphabet the identifier is spelled in, then how long it is, then the
+// characters. Each alphabet gets its own trees, because the three are not
+// independent: video ids are eleven characters of everything, hashes are
+// thirty-two of lowercase and digits, and slugs are any length at all.
+alloc('segAlphabet', boundedSize(ALPHABET_COUNT));
+alloc('segTokenLength', ALPHABET_COUNT * UINT_SLOTS);
+alloc('segToken', ALPHABET_SLOTS);
 alloc('segExt', treeSize(EXT_BITS));
 
 // --- query ------------------------------------------------------------------
@@ -62,8 +63,9 @@ alloc('valueWord', treeSize(WORD_BITS));
 alloc('valueNumber', UINT_SLOTS);
 alloc('valueHexLength', UINT_SLOTS);
 alloc('valueHex', treeSize(4));
-alloc('valueTokenLength', UINT_SLOTS);
-alloc('valueToken', TOKEN_CONTEXTS * treeSize(6));
+alloc('valueAlphabet', boundedSize(ALPHABET_COUNT));
+alloc('valueTokenLength', ALPHABET_COUNT * UINT_SLOTS);
+alloc('valueToken', ALPHABET_SLOTS);
 alloc('valueExt', treeSize(EXT_BITS));
 
 // --- fragment ---------------------------------------------------------------

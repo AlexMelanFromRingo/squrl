@@ -9,8 +9,14 @@
 // cheapest representation it can *prove* round-trips, and writes which one it
 // chose, so the decoder never guesses.
 
-import { putTree, getTree, putUint, getUint, UINT_SLOTS, treeSize, Encoder } from './rc.js';
-import { SLOT, ROLE, classOf, firstClass, TOKEN_CONTEXTS } from './slots.js';
+import {
+  putTree, getTree, putUint, getUint, putBounded, getBounded,
+  UINT_SLOTS, treeSize, Encoder,
+} from './rc.js';
+import { SLOT, ROLE, classOf, firstClass } from './slots.js';
+import {
+  ALPHABET_COUNT, fit, offsetOf, sizeOf, symbolAt, indexOf as symbolIndex,
+} from './alphabet.js';
 import {
   HOSTS, HOST_INDEX, HOST_BITS,
   TLDS, TLD_INDEX, TLD_BITS, TLD_ESCAPE,
@@ -20,7 +26,7 @@ import {
 } from './dict.js';
 import { split, join, isNumber, isHex, hexBytes, hexString } from './parse.js';
 
-export const VERSION = 0;
+export const VERSION = 1;
 
 // The version is two bits, and 3 is not a version: it means "a number
 // follows". Formats that run out of room for a version number are how old
@@ -70,18 +76,9 @@ const KIND = {
   empty: 0, word: 1, number: 2, hex: 3, token: 4, file: 5, percent: 6, text: 7,
 };
 
-// Exactly 64 characters: the alphabet of every id, slug, hash fragment and
-// video code on the web, at six bits each instead of the eight a byte costs.
-const TOKEN_CHARS = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_';
-const TOKEN_INDEX = new Map([...TOKEN_CHARS].map((c, i) => [c, i]));
-const isToken = (text) => text.length > 0 && [...text].every((c) => TOKEN_INDEX.has(c));
-
-function tokenContext(ch) {
-  if (ch === undefined) return 0;
-  if (ch >= 'a' && ch <= 'z') return 1;
-  if (ch >= 'A' && ch <= 'Z') return 2;
-  return 3;
-}
+// An identifier is any run of letters, digits, `-` and `_`. Which of those a
+// given run actually uses decides what each character costs: see alphabet.js.
+const isToken = (text) => fit(text) >= 0;
 
 const SEG_TYPE_SPAN = treeSize(3);      // one segment-shape tree per context
 
@@ -191,23 +188,55 @@ function getPort(dec) {
 }
 
 // --- identifiers ------------------------------------------------------------
+//
+// The alphabet is chosen once per run and written first, which costs under
+// three bits; every character after that is coded over that alphabet alone.
+// For a lowercase slug that is 4.81 bits a character instead of 6.
 
-function putToken(enc, base, text) {
-  let ctx = 0;
-  for (const ch of text) {
-    putTree(enc, base + ctx * 64, 6, TOKEN_INDEX.get(ch));
-    ctx = tokenContext(ch);
-  }
+function writeToken(enc, slots, text, id) {
+  putBounded(enc, slots.alphabet, ALPHABET_COUNT, id);
+  putUint(enc, slots.tokenLength + id * UINT_SLOTS, text.length);
+
+  const base = slots.token + offsetOf(id);
+  const size = sizeOf(id);
+  for (const ch of text) putBounded(enc, base, size, symbolIndex(id, ch));
 }
 
-function getToken(dec, base, length) {
-  let ctx = 0;
-  let out = '';
-  for (let i = 0; i < length; i++) {
-    const ch = TOKEN_CHARS[getTree(dec, base + ctx * 64, 6)];
-    out += ch;
-    ctx = tokenContext(ch);
+function putToken(enc, slots, text) {
+  const narrowest = fit(text);
+
+  // The narrowest alphabet is usually the cheapest, but not always: a wide one
+  // that the corpus exercised heavily can beat a narrow one it barely saw, and
+  // an overconfident prior on a rare alphabet can cost more than the uniform
+  // bound it was supposed to beat. Since the choice travels in the stream, the
+  // encoder can simply try them all.
+  let best = narrowest;
+  let cheapest = Infinity;
+
+  for (let id = narrowest; id < ALPHABET_COUNT; id++) {
+    if (symbolIndex(id, text[0]) === undefined) continue;
+    if ([...text].some((ch) => symbolIndex(id, ch) === undefined)) continue;
+
+    const trial = new Encoder(enc.m.clone());
+    writeToken(trial, slots, text, id);
+    if (trial.total < cheapest) {
+      cheapest = trial.total;
+      best = id;
+    }
   }
+
+  writeToken(enc, slots, text, best);
+}
+
+function getToken(dec, slots) {
+  const id = getBounded(dec, slots.alphabet, ALPHABET_COUNT);
+  const length = bounded(
+    getUint(dec, slots.tokenLength + id * UINT_SLOTS), LIMIT.text, 'token length');
+
+  const base = slots.token + offsetOf(id);
+  const size = sizeOf(id);
+  let out = '';
+  for (let i = 0; i < length; i++) out += symbolAt(id, getBounded(dec, base, size));
   return out;
 }
 
@@ -335,12 +364,10 @@ function putPiece(enc, text, kind, slots, role) {
       return;
     }
     case KIND.token:
-      putUint(enc, slots.tokenLength, text.length);
-      return putToken(enc, slots.token, text);
+      return putToken(enc, slots, text);
     case KIND.file: {
       const { name, ext } = fileParts(text);
-      putUint(enc, slots.tokenLength, name.length);
-      putToken(enc, slots.token, name);
+      putToken(enc, slots, name);
       return putTree(enc, slots.ext, EXT_BITS, EXT_INDEX.get(ext));
     }
     case KIND.percent:
@@ -374,11 +401,9 @@ function getPiece(dec, kind, slots, role) {
       return hexString(bytes);
     }
     case KIND.token:
-      return getToken(dec, slots.token,
-        bounded(getUint(dec, slots.tokenLength), LIMIT.text, 'token length'));
+      return getToken(dec, slots);
     case KIND.file: {
-      const name = getToken(dec, slots.token,
-        bounded(getUint(dec, slots.tokenLength), LIMIT.text, 'token length'));
+      const name = getToken(dec, slots);
       return `${name}.${EXTENSIONS[getTree(dec, slots.ext, EXT_BITS)]}`;
     }
     case KIND.percent:
@@ -394,6 +419,7 @@ const SEGMENT_SLOTS = {
   hexLength: SLOT.segHexLength,
   hex: SLOT.segHex,
   tokenLength: SLOT.segTokenLength,
+  alphabet: SLOT.segAlphabet,
   token: SLOT.segToken,
   ext: SLOT.segExt,
 };
@@ -404,6 +430,7 @@ const VALUE_SLOTS = {
   hexLength: SLOT.valueHexLength,
   hex: SLOT.valueHex,
   tokenLength: SLOT.valueTokenLength,
+  alphabet: SLOT.valueAlphabet,
   token: SLOT.valueToken,
   ext: SLOT.valueExt,
 };

@@ -20,7 +20,7 @@
 </tr>
 <tr>
   <td align="center"><sub>the URL<br><b>118 characters &middot; 41&times;41</b></sub></td>
-  <td align="center"><sub>the same URL, compressed<br><b>74 characters &middot; 29&times;29</b></sub></td>
+  <td align="center"><sub>the same URL, compressed<br><b>77 characters &middot; 29&times;29</b></sub></td>
 </tr>
 </table>
 
@@ -37,16 +37,16 @@
 </p>
 
 <p align="center"><sub>The bar is the point: every part of the URL takes as much width as it costs.
-The scheme is too narrow to draw at 0.05 bits.</sub></p>
+The scheme is too narrow to draw at 0.04 bits.</sub></p>
 
 ```bash
 git clone https://github.com/AlexMelanFromRingo/squrl
 cd squrl && npm link          # nothing to install: dependencies is {}
 
 squrl 'https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=42s'
-# https://sq.gy/3FW1PKGIWMQCIJRGQTZ697DAN
+# https://sq.gy/GCJ85IZ32MX1QUHB9IYSZWZ
 
-squrl expand https://sq.gy/3FW1PKGIWMQCIJRGQTZ697DAN
+squrl expand https://sq.gy/GCJ85IZ32MX1QUHB9IYSZWZ
 # https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=42s
 
 squrl qr 'https://example.com/some/page'     # draws it in the terminal
@@ -65,7 +65,7 @@ https://www.youtube.com/watch?v=dQw4w9WgXcQ
 ```
 
 There are two schemes worth having. One bit tells them apart — and once a model
-knows that most links are `https`, that bit costs **0.05 bits**, because that is
+knows that most links are `https`, that bit costs **0.04 bits**, because that is
 what arithmetic coding does with a decision you were already sure about. `www.`
 is another flag. `youtube.com` is an index into a list. `/watch` is a word.
 
@@ -78,20 +78,20 @@ $ squrl explain 'https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=42s'
 https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=42s
 49 characters, 392 bits as text
 
-  scheme      0.05 bits
-  host         7.9 bits  ##
-  path         9.4 bits  ###
-  query      109.4 bits  ###################################
-  fragment    0.06 bits
+  scheme      0.04 bits
+  host         7.8 bits  ###
+  path         9.2 bits  ###
+  query      107.5 bits  ###################################
+  fragment    0.05 bits
   --------- -----------
-  total      126.8 bits  -> 16 bytes
+  total      124.6 bits  -> 15 bytes
 
-  link  https://sq.gy/3FW1PKGIWMQCIJRGQTZ697DAN
-        39 characters, 20% shorter
+  link  https://sq.gy/GCJ85IZ32MX1QUHB9IYSZWZ
+        37 characters, 24% shorter
 ```
 
 Eight bits for `https://www.youtube.com`, nine for `/watch`, and a hundred and
-nine for the query. That last number is not a failure: `dQw4w9WgXcQ` is eleven
+seven for the query. That last number is not a failure: `dQw4w9WgXcQ` is eleven
 characters from an alphabet of 64, which is 66 bits of genuine randomness, and
 no model gets those for free.
 
@@ -133,9 +133,9 @@ wrangler deploy server/worker.js   # or any edge runtime — there is no I/O to 
 ```
 
 ```
-GET /3FW1PKGIWMQCIJRGQTZ697DAN            301, Location: the original URL
-GET /3FW1PKGIWMQCIJRGQTZ697DAN?preview    a page showing where it goes
-GET /health                               ok
+GET /GCJ85IZ32MX1QUHB9IYSZWZ            301, Location: the original URL
+GET /GCJ85IZ32MX1QUHB9IYSZWZ?preview    a page showing where it goes
+GET /health                             ok
 ```
 
 The redirect is `301` with `max-age=31536000, immutable`, because the mapping is
@@ -149,24 +149,25 @@ URL and always will.
 
 |  | original | compressed |  |
 |---|---:|---:|---:|
-| characters | 4093 | 3499 | **85%** |
-| payload bytes | 4093 | 1580 | **39%** |
-| QR modules | 72850 | 54586 | **75%** |
+| characters | 4093 | 3456 | **84%** |
+| payload bytes | 4093 | 1552 | **38%** |
+| QR modules | 72850 | 53938 | **74%** |
 
-59 of 74 links came out shorter as text. 65 needed a smaller QR version, 9 came
+62 of 74 links came out shorter as text. 65 needed a smaller QR version, 9 came
 out the same size, none got bigger.
 
-Those two numbers — 39% and 85% — are the honest shape of the thing. The
-*compression* is better than two to one. The *link* is only 15% shorter, because
+Those two numbers — 38% and 84% — are the honest shape of the thing. The
+*compression* is better than two and a half to one. The *link* is only 16%
+shorter, because
 `https://sq.gy/` is fourteen characters of overhead and base36 costs 1.55
 characters per byte. On short URLs that eats the entire win:
 
 | original URL | count | characters | QR modules |
 |---|---:|---:|---:|
-| under 40 chars | 16 | 93% | 81% |
-| 40–60 chars | 28 | 89% | 76% |
-| 60–90 chars | 28 | 84% | 74% |
-| over 90 chars | 2 | 57% | 56% |
+| under 40 chars | 16 | 92% | 79% |
+| 40–60 chars | 28 | 88% | 75% |
+| 60–90 chars | 28 | 83% | 73% |
+| over 90 chars | 2 | 56% | 56% |
 
 **Under about 35 characters, don't bother.** squrl will hand you back something
 longer, and say so. Where it earns its keep is the kind of link people actually
@@ -176,7 +177,7 @@ paste at each other:
 |---|---:|---:|---|
 | `https://www.youtube.com/watch?v=kJQP7kiw5Fk&t=90s` | 49 | 39 | v3 29² byte → v2 25² alnum |
 | `https://ru.wikipedia.org/wiki/%D0%9A%D0%BE%D0%B4_…` | 97 | 42 | v5 37² byte → v2 25² alnum |
-| `https://tracker.example.net/c?utm_source=facebook…` | 126 | 84 | v6 41² byte → v4 33² alnum |
+| `https://tracker.example.net/c?utm_source=facebook…` | 126 | 83 | v6 41² byte → v4 33² alnum |
 
 The Cyrillic one is the clearest case: percent-encoded UTF-8 spends three
 characters per byte, and squrl decodes it back to bytes before coding it. 97
@@ -196,6 +197,28 @@ word, a number, a hash, an identifier, a filename, percent-escaped text?* Each
 piece is encoded **every way that fits**, against a copy of the model, and only
 the cheapest is written. The shape travels in the stream, so the decoder is told
 rather than guessing.
+
+**2a. Identifiers get an alphabet.** The part of a modern URL that costs
+anything is the identifiers, and they are not random over the same character
+set every time. `how-we-scaled` never uses a capital; a commit hash is
+lowercase and digits; a video id uses everything. So the encoder picks the
+narrowest of seven alphabets that covers the run, writes which one, and codes
+each character over that alphabet alone:
+
+| alphabet | symbols | bits per character |
+|---|---:|---:|
+| digits and `-_` | 12 | 3.58 |
+| one case and `-_` | 28 | 4.81 |
+| one case, digits and `-_` | 38 | 5.25 |
+| both cases and `-_` | 54 | 5.75 |
+| everything | 64 | 6.00 |
+
+Those are not rounded up to whole bits. An index into 38 symbols is coded by
+binary search over the interval rather than a fixed-width tree, so it costs
+5.25 bits and not the six a tree would spend. The alphabet, the length and the
+characters each have their own models per alphabet, because the three are not
+independent: hashes are 32 characters of lowercase and digits, video ids are
+11 of everything, and slugs are any length at all.
 
 **3. Price the decisions.** `src/rc.js` is a binary range coder. Expected
 decisions cost a fraction of a bit; surprising ones cost several. The starting
@@ -249,16 +272,16 @@ The single biggest win available is not compression:
 
 ```console
 $ squrl 'https://www.ozon.ru/product/…-9876543210/?utm_source=yandex&utm_medium=cpc&utm_campaign=autumn'
-https://sq.gy/EWE74NGMQJVF38L2022TKB3WGJ4XZL31QYM3SKJWFECY3U2WC37T6JNO4ICY
-118 chars -> 74 (39 bytes of payload, -44 chars)
+https://sq.gy/IDJ86JYTWN6YAD6JQCX408LFXH46XRQNZOVHS5MFUEKER3R9LR4EJ7ABJ88UAZ8
+118 chars -> 77 (41 bytes of payload, -41 chars)
 
 $ squrl --strip-tracking 'https://www.ozon.ru/product/…-9876543210/?utm_source=yandex&utm_medium=cpc&utm_campaign=autumn'
 dropped 3 tracking parameter(s): utm_source=yandex utm_medium=cpc utm_campaign=autumn
-https://sq.gy/1XTX9LTIS2O0QUFBOP8WE6XRLUD5ORFMG51J6XQUZZ
-65 chars -> 56 (27 bytes of payload, -9 chars)
+https://sq.gy/C3ZV2BVVAGOWP6TE8SGKXACSQB2ZG7ZCNQT8Q7WZQUD
+65 chars -> 57 (28 bytes of payload, -8 chars)
 ```
 
-Three campaign parameters were 53 of that URL's 118 characters, and 12 of the 39
+Three campaign parameters were 53 of that URL's 118 characters, and 13 of the 41
 bytes they compressed to. Dropping them is **off by default and always
 announced**, because it changes the URL — the one place squrl will do that.
 
@@ -273,7 +296,9 @@ retrain on your own corpus:
 - so bump `VERSION` in `src/model.js`, and keep the old tables if you need both.
 
 The format leaves room for that: the version is two bits, where `3` means "a
-number follows", so there is no cliff at version four.
+number follows", so there is no cliff at version four. The current version is 1;
+version 0 links, made before identifiers got their own alphabets, are refused
+rather than misread.
 
 Two more things worth saying plainly. A payload is **not encrypted** — anyone
 holding this library can read it, and that is the point. And whoever hosts the
@@ -284,7 +309,7 @@ dependency-free files you can run yourself.
 ## Tests
 
 ```bash
-npm test        # 60 tests, node:test, no framework
+npm test        # 70 tests, node:test, no framework
 ```
 
 The ones that matter are the round trips: every URL in the corpus, every URL in
@@ -301,18 +326,20 @@ header injection.
 
 ## Prior art
 
-**[p2r3/ha.mr](https://github.com/p2r3/ha.mr)** got there first, and got two
-things right that this project took from it: a static host serving `404.html`
-is a complete redirector, and a payload in the fragment never reaches the server
-at all. It compresses with Huffman-coded dictionaries built from real link
-datasets, and fits each segment to the narrowest character set that covers it —
-an idea worth stealing next, since squrl currently spends a flat six bits on
-every identifier character where a lowercase-only alphabet would spend 5.25.
+**[p2r3/ha.mr](https://github.com/p2r3/ha.mr)** got there first, and three of
+its ideas are in here: a static host serving `404.html` is a complete
+redirector, a payload in the fragment never reaches the server at all, and each
+segment should be fitted to the narrowest character set that covers it. That
+last one is worth about 2% of the payload here — less than it sounds, because
+trial encoding was already recovering some of it through the byte model, and
+more than it sounds on identifier-heavy links, where it is the difference
+between 4.81 bits a character and 6.
 
 The differences are in the middle layer: squrl codes arithmetically rather than
-with Huffman codes, so a decision can cost a fraction of a bit; its starting
-probabilities are fitted to a corpus and shipped; and it encodes each piece
-several ways to keep the cheapest.
+with Huffman codes, so a decision can cost a fraction of a bit and an alphabet
+index need not round up to a whole one; its starting probabilities are fitted to
+a corpus and shipped; and it encodes each piece several ways — and each
+identifier in every alphabet that covers it — to keep the cheapest.
 
 ## License
 

@@ -444,8 +444,9 @@ const base = location.protocol.startsWith('http')
 const FIELDS = ['scheme', 'host', 'path', 'query', 'fragment', 'raw'];
 
 // What the same payload would cost on the kind of host you would register for
-// this. Nothing is served from it; it is a ruler, not a redirect.
-const SHORT_HOST = 'sq.gy/';
+// this -- scheme included, because a link without one is not a link. Nothing
+// is served from it; it is a ruler, not a redirect.
+const SHORT_HOST = 'https://sq.gy/';
 
 let current = '';
 
@@ -570,7 +571,7 @@ function render() {
   // Showing both keeps the demo honest without pretending the domain is free.
   const short = `${SHORT_HOST}${packed.payload}`;
   if (short.length !== link.length) {
-    rows.push([`On ${SHORT_HOST}`, `${short.length} characters`, false]);
+    rows.push(['On a short host', `${short.length} characters, e.g. ${SHORT_HOST}`, false]);
   }
   if (dropped.length) rows.push(['Dropped', `${dropped.length} tracking parameter(s)`, false]);
 

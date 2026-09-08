@@ -32,6 +32,13 @@
 
 **[alexmelanfromringo.github.io/squrl](https://alexmelanfromringo.github.io/squrl/)** — compresses in the tab, sends nothing anywhere.
 
+<p align="center">
+  <img src="docs/ui.png" width="760" alt="The squrl page: a pasted URL, a bar showing what each part of it costs in bits, the compressed link and its QR code">
+</p>
+
+<p align="center"><sub>The bar is the point: every part of the URL takes as much width as it costs.
+The scheme is too narrow to draw at 0.05 bits.</sub></p>
+
 ```bash
 git clone https://github.com/AlexMelanFromRingo/squrl
 cd squrl && npm link          # nothing to install: dependencies is {}

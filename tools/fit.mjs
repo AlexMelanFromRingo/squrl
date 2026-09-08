@@ -11,7 +11,7 @@ import { readFileSync } from 'node:fs';
 import { ONE, Models, Encoder } from '../src/rc.js';
 import { SLOT, SLOT_COUNT } from '../src/slots.js';
 import { ALPHABET_SLOTS } from '../src/alphabet.js';
-import { encodeUrl } from '../src/model.js';
+import { encodeUrl, VERSION_MODEL } from '../src/model.js';
 
 /** Read a URL list, ignoring blanks and comments. */
 export function readUrls(path) {
@@ -91,6 +91,13 @@ export function fit({ zero, one }, { alpha = 1, tokenAlpha = 12 } = {}) {
     const a = inTokenRegion(i) ? tokenAlpha : alpha;
     const p = Math.round(((one[i] + a) / (total + 2 * a)) * ONE);
     table[i] = Math.min(ONE - FLOOR, Math.max(FLOOR, p));
+  }
+
+  // The version field is not learned from anything: see VERSION_MODEL. Every
+  // retraining writes the same two numbers, so a decoder from any generation
+  // can still read the version of a payload from any other.
+  for (const [offset, probability] of VERSION_MODEL) {
+    table[SLOT.version + offset] = probability;
   }
 
   return { table, trained };

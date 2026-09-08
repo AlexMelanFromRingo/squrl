@@ -44,9 +44,9 @@ git clone https://github.com/AlexMelanFromRingo/squrl
 cd squrl && npm link          # nothing to install: dependencies is {}
 
 squrl 'https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=42s'
-# https://sq.gy/GCJ85IZ32MX1QUHB9IYSZWZ
+# https://sq.gy/3CS58RR0A5YLN9DGTVBMDDQ0M
 
-squrl expand https://sq.gy/GCJ85IZ32MX1QUHB9IYSZWZ
+squrl expand https://sq.gy/3CS58RR0A5YLN9DGTVBMDDQ0M
 # https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=42s
 
 squrl qr 'https://example.com/some/page'     # draws it in the terminal
@@ -84,10 +84,10 @@ https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=42s
   query      107.5 bits  ###################################
   fragment    0.05 bits
   --------- -----------
-  total      124.6 bits  -> 15 bytes
+  total      124.6 bits  -> 16 bytes
 
-  link  https://sq.gy/GCJ85IZ32MX1QUHB9IYSZWZ
-        37 characters, 24% shorter
+  link  https://sq.gy/3CS58RR0A5YLN9DGTVBMDDQ0M
+        39 characters, 20% shorter
 ```
 
 Eight bits for `https://www.youtube.com`, nine for `/watch`, and a hundred and
@@ -133,9 +133,9 @@ wrangler deploy server/worker.js   # or any edge runtime — there is no I/O to 
 ```
 
 ```
-GET /GCJ85IZ32MX1QUHB9IYSZWZ            301, Location: the original URL
-GET /GCJ85IZ32MX1QUHB9IYSZWZ?preview    a page showing where it goes
-GET /health                             ok
+GET /3CS58RR0A5YLN9DGTVBMDDQ0M            301, Location: the original URL
+GET /3CS58RR0A5YLN9DGTVBMDDQ0M?preview    a page showing where it goes
+GET /health                               ok
 ```
 
 The redirect is `301` with `max-age=31536000, immutable`, because the mapping is
@@ -149,9 +149,9 @@ URL and always will.
 
 |  | original | compressed |  |
 |---|---:|---:|---:|
-| characters | 4093 | 3456 | **84%** |
-| payload bytes | 4093 | 1552 | **38%** |
-| QR modules | 72850 | 53938 | **74%** |
+| characters | 4093 | 3454 | **84%** |
+| payload bytes | 4093 | 1549 | **38%** |
+| QR modules | 72850 | 54122 | **74%** |
 
 62 of 74 links came out shorter as text. 65 needed a smaller QR version, 9 came
 out the same size, none got bigger.
@@ -164,7 +164,7 @@ characters per byte. On short URLs that eats the entire win:
 
 | original URL | count | characters | QR modules |
 |---|---:|---:|---:|
-| under 40 chars | 16 | 92% | 79% |
+| under 40 chars | 16 | 92% | 81% |
 | 40–60 chars | 28 | 88% | 75% |
 | 60–90 chars | 28 | 83% | 73% |
 | over 90 chars | 2 | 56% | 56% |
@@ -272,12 +272,12 @@ The single biggest win available is not compression:
 
 ```console
 $ squrl 'https://www.ozon.ru/product/…-9876543210/?utm_source=yandex&utm_medium=cpc&utm_campaign=autumn'
-https://sq.gy/IDJ86JYTWN6YAD6JQCX408LFXH46XRQNZOVHS5MFUEKER3R9LR4EJ7ABJ88UAZ8
+https://sq.gy/KDX5AEVFVX4EZZ29B751JVX6D7T36ZTZXI0XEP0F6C2GN3RE2PD0YZEFMJSLRHT
 118 chars -> 77 (41 bytes of payload, -41 chars)
 
 $ squrl --strip-tracking 'https://www.ozon.ru/product/…-9876543210/?utm_source=yandex&utm_medium=cpc&utm_campaign=autumn'
 dropped 3 tracking parameter(s): utm_source=yandex utm_medium=cpc utm_campaign=autumn
-https://sq.gy/C3ZV2BVVAGOWP6TE8SGKXACSQB2ZG7ZCNQT8Q7WZQUD
+https://sq.gy/DFPCBDEW4RIKV4TJH9YQS0F6XR2RETAPK0IMZCXHBRT
 65 chars -> 57 (28 bytes of payload, -8 chars)
 ```
 
@@ -296,9 +296,14 @@ retrain on your own corpus:
 - so bump `VERSION` in `src/model.js`, and keep the old tables if you need both.
 
 The format leaves room for that: the version is two bits, where `3` means "a
-number follows", so there is no cliff at version four. The current version is 1;
-version 0 links, made before identifiers got their own alphabets, are refused
-rather than misread.
+number follows", so there is no cliff at version four. The current version is 1.
+
+The version field is the one place with **frozen** probabilities, never trained
+and never changed. That is not a detail: a range-coded stream is unreadable
+without the numbers that wrote it, so a version field priced by the trained
+prior would decode to garbage the moment the prior moved — identifying nothing.
+Held fixed, it costs the current version six hundredths of a bit and lets any
+decoder say `unsupported format version 0` instead of returning the wrong URL.
 
 Two more things worth saying plainly. A payload is **not encrypted** — anyone
 holding this library can read it, and that is the point. And whoever hosts the
@@ -309,7 +314,7 @@ dependency-free files you can run yourself.
 ## Tests
 
 ```bash
-npm test        # 70 tests, node:test, no framework
+npm test        # 71 tests, node:test, no framework
 ```
 
 The ones that matter are the round trips: every URL in the corpus, every URL in

@@ -33,6 +33,23 @@ export const VERSION = 1;
 // links stop working, and two bits is not much room.
 const VERSION_ESCAPE = 3;
 
+/**
+ * Fixed probabilities for the version field, never trained and never changed.
+ *
+ * A range-coded stream is only readable by a decoder holding the same
+ * probabilities, so a version field priced by the trained prior is worthless
+ * for its one job: the moment the prior changes, an old payload's version bits
+ * decode to something else and the stream is misread rather than refused.
+ *
+ * These two numbers are therefore frozen. They cost the current version about a
+ * third of a bit and every other version a few, which is the right way round.
+ * A future format that changes VERSION must leave this table alone.
+ */
+export const VERSION_MODEL = [
+  [1, 82],      // first bit: versions 0 and 1 live in the low half
+  [2, 4014],    // second bit: 1 is the current version
+];
+
 function putVersion(enc, version) {
   putTree(enc, SLOT.version, 2, Math.min(version, VERSION_ESCAPE));
   if (version >= VERSION_ESCAPE) putUint(enc, SLOT.versionExtra, version);

@@ -2,7 +2,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
-import { pack, unpack, shorten, expand, DEFAULT_BASE } from '../src/codec.js';
+import { pack, unpack, shorten, expand, DEFAULT_BASE, freshModels } from '../src/codec.js';
+import { Encoder, putTree } from '../src/rc.js';
+import { SLOT } from '../src/slots.js';
 import { split, join } from '../src/parse.js';
 import { LIMIT } from '../src/model.js';
 
@@ -204,4 +206,16 @@ test('the payload of a long URL grows, but far slower than the URL', () => {
 test('pack refuses input it cannot represent instead of returning something wrong', () => {
   assert.throws(() => pack(undefined), /string/);
   assert.throws(() => pack(42), /string/);
+});
+
+
+test('a payload from another format version is named, not misread', () => {
+  // The version field is priced by a frozen model precisely so this works: a
+  // range-coded stream is unreadable without the probabilities that wrote it,
+  // and a version field that moves with the prior cannot identify anything.
+  const enc = new Encoder(freshModels());
+  putTree(enc, SLOT.version, 2, 0);
+  for (let i = 0; i < 64; i++) enc.bit(SLOT.mode + (i % 2), i % 3 === 0 ? 1 : 0);
+
+  assert.throws(() => unpack(enc.finish()), /unsupported format version 0/);
 });

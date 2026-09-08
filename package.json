@@ -1,0 +1,45 @@
+{
+  "name": "squrl",
+  "version": "0.1.0",
+  "description": "A URL compressor whose output is still a link: structure-aware modelling, arithmetic coding and a QR-friendly alphabet. No database, no shortener.",
+  "type": "module",
+  "main": "src/codec.js",
+  "exports": {
+    ".": "./src/codec.js",
+    "./qr": "./src/qr.js",
+    "./server": "./server/handler.js"
+  },
+  "bin": {
+    "squrl": "bin/squrl.js"
+  },
+  "files": [
+    "src/",
+    "server/",
+    "bin/",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "test": "node --test test/*.mjs",
+    "start": "node server/redirect.js",
+    "train": "node tools/train.mjs > src/prior.js",
+    "bench": "node tools/bench.mjs",
+    "qr-check": "node tools/qr-check.mjs"
+  },
+  "keywords": [
+    "url",
+    "compression",
+    "qr",
+    "shortener",
+    "arithmetic-coding",
+    "range-coder",
+    "stateless"
+  ],
+  "author": "Alex Melan",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {},
+  "devDependencies": {}
+}

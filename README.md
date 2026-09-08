@@ -268,6 +268,55 @@ written most significant bit first, and the module at (n−8, 8) is not a format
 bit at all — it is the dark module, and writing over it produces a symbol that
 looks perfect and scans as nothing.
 
+## Why not gzip, and why not a byte table
+
+Two reasonable ideas, both measurably worse here. `npm run compare` runs them:
+
+| on 74 held-out URLs | bytes | of the original |
+|---|---:|---:|
+| bzip2 -9 | 6536 | 158% |
+| gzip -9 | 5362 | 130% |
+| xz -9 (lzma2) | 4365 | 106% |
+| deflate, raw, -9 | 4030 | 98% |
+| brotli q11, which ships a web dictionary | 3743 | 91% |
+| deflate with a preset dictionary of these hostnames | 2774 | 67% |
+| one byte per entry from a 128-entry table | 2681 | 65% |
+| **squrl** | **1566** | **38%** |
+
+On one 49-character URL, `https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=42s`:
+bzip2 makes it 86 bytes, gzip 69, xz 53, brotli 45, a byte table 23 — squrl, 16.
+
+**General-purpose compressors learn from the data they are given**, and a URL
+is fifty bytes. There is nothing to learn in fifty bytes, and the format
+overhead is charged anyway: gzip spends eighteen bytes on a header and trailer
+before it compresses anything, and bzip2's block structure makes a short URL
+half again as long. They are the right tools for a megabyte of logs and the
+wrong one for a single link. squrl carries what they would have to learn —
+`src/prior.js` — as a 30 kB table that never travels with the payload.
+
+**A table of one-byte codes** is the other idea, and half of it is already
+here: `src/dict.js` is exactly that table, with 237 hostnames, 236 path and
+query words, 63 public suffixes and 32 file extensions. What differs is the
+price. A byte is a byte; these indices are range coded against a trained
+prior, so a common entry costs less than a whole one and a rare one costs
+more.
+
+Two places where that matters, and one where it does not:
+
+- **Predictable is not the same as common.** `https://` is not stored at all;
+  it is guessed, and the correction costs **0.04 bits** against a byte code's
+  8. The same goes for every flag in the format — `www.`, "has a query", "has
+  a fragment" — each a few hundredths of a bit.
+- **Most of a URL is not in any table.** Three quarters of the bits in these
+  74 URLs go to identifiers that appear exactly once: `dQw4w9WgXcQ`,
+  `9f2c1a4e…`, a product number. A byte table spends 8 bits on each of those
+  characters. squrl spends 4.81 to 6, depending on which alphabet the
+  identifier turns out to use.
+- **On a plain dictionary hit the two are level.** `/watch` costs squrl 9.2
+  bits — the flag, the segment count, the shape, then the index — against the
+  table's flat 8. The gain was never in the lookup; it is in everything around
+  it.
+
 ## Tracking parameters
 
 The single biggest win available is not compression:

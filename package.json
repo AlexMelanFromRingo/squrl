@@ -24,7 +24,8 @@
     "start": "node server/redirect.js",
     "train": "node tools/train.mjs > src/prior.js && node tools/canary.mjs > src/canary.js",
     "bench": "node tools/bench.mjs",
-    "qr-check": "node tools/qr-check.mjs"
+    "qr-check": "node tools/qr-check.mjs",
+    "compare": "node tools/vs-generic.mjs"
   },
   "keywords": [
     "url",

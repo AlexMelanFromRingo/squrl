@@ -443,6 +443,10 @@ const base = location.protocol.startsWith('http')
 
 const FIELDS = ['scheme', 'host', 'path', 'query', 'fragment', 'raw'];
 
+// What the same payload would cost on the kind of host you would register for
+// this. Nothing is served from it; it is a ruler, not a redirect.
+const SHORT_HOST = 'sq.gy/';
+
 let current = '';
 
 function reset(message) {
@@ -560,6 +564,14 @@ function render() {
     ['QR modules', `${symbol.size}x${symbol.size}, was ${before.size}x${before.size}`,
       symbol.size > before.size],
   ];
+
+  // This page is hosted somewhere with a long name, and that overhead is real:
+  // fourteen characters of `https://sq.gy/` versus forty-four of a Pages URL.
+  // Showing both keeps the demo honest without pretending the domain is free.
+  const short = `${SHORT_HOST}${packed.payload}`;
+  if (short.length !== link.length) {
+    rows.push([`On ${SHORT_HOST}`, `${short.length} characters`, false]);
+  }
   if (dropped.length) rows.push(['Dropped', `${dropped.length} tracking parameter(s)`, false]);
 
   for (const [term, value, warn] of rows) {

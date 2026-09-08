@@ -1,0 +1,601 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>squrl — a URL compressor whose output is still a link</title>
+<meta name="description" content="Compresses a URL into the link itself. No database, no shortener, nothing stored anywhere. Runs entirely in your browser.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='14' font-size='14'>🐿️</text></svg>">
+<style>
+  /* Everything here is a system font. A page whose whole argument is that
+     nothing leaves your machine cannot start by fetching a typeface from
+     someone else's server. */
+  :root {
+    --paper: #edf0ec;
+    --plate: #f7f9f6;
+    --ink: #16232b;
+    --muted: #5f6e6a;
+    --rule: #c9d2cb;
+    --accent: #2438c8;
+    --warn: #8a4b12;
+
+    --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --mono: ui-monospace, "SF Mono", "Cascadia Mono", "Roboto Mono", Menlo, monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #101718;
+      --plate: #172021;
+      --ink: #e7ece8;
+      --muted: #93a29d;
+      --rule: #2e3a3a;
+      --accent: #8b9bff;
+      --warn: #d9955a;
+    }
+  }
+
+  * { box-sizing: border-box; }
+
+  html { -webkit-text-size-adjust: 100%; }
+
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 16px;
+    line-height: 1.5;
+  }
+
+  .wrap {
+    max-width: 62rem;
+    margin: 0 auto;
+    padding: 1.5rem 1.25rem 5rem;
+  }
+
+  /* --- masthead ---------------------------------------------------------- */
+
+  header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 1rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 2px solid var(--ink);
+  }
+
+  h1 {
+    font-size: clamp(2.4rem, 9vw, 4rem);
+    line-height: 0.9;
+    letter-spacing: -0.055em;
+    font-weight: 800;
+    margin: 0;
+  }
+
+  header p {
+    margin: 0;
+    max-width: 26rem;
+    text-align: right;
+    text-wrap: balance;
+    color: var(--muted);
+    font-size: 0.9rem;
+    line-height: 1.35;
+  }
+
+  /* --- the input --------------------------------------------------------- */
+
+  .field { margin: 2.25rem 0 0; }
+
+  label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-size: 0.95rem;
+    color: var(--muted);
+  }
+
+  textarea {
+    display: block;
+    width: 100%;
+    min-height: 4.5rem;
+    padding: 0.85rem 1rem;
+    border: 1px solid var(--rule);
+    border-radius: 2px;
+    background: var(--plate);
+    color: var(--ink);
+    font-family: var(--mono);
+    font-size: 1rem;
+    line-height: 1.45;
+    resize: vertical;
+    overflow-wrap: anywhere;
+  }
+
+  textarea:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+    border-color: transparent;
+  }
+
+  .options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.25rem;
+    margin-top: 0.75rem;
+    font-size: 0.9rem;
+    color: var(--muted);
+  }
+
+  .options label {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    margin: 0;
+    cursor: pointer;
+  }
+
+  input[type="checkbox"] { accent-color: var(--accent); }
+
+  /* --- the bit ruler ----------------------------------------------------- */
+  /*
+     The point of the whole project, drawn to scale: every field of the URL
+     takes exactly as much width as it costs in bits.
+  */
+
+  .ruler { margin: 2.5rem 0 0; }
+
+  .bar {
+    display: flex;
+    height: 2.75rem;
+    border: 1px solid var(--ink);
+    border-radius: 1px;
+    overflow: hidden;
+    background: var(--plate);
+  }
+
+  .seg {
+    position: relative;
+    min-width: 0;
+    border-right: 1px solid var(--ink);
+    background: var(--plate);
+    transition: flex-basis 220ms ease, flex-grow 220ms ease;
+  }
+
+  .seg:last-child { border-right: 0; }
+
+  /* Alternating bands, the way a measuring tape marks off distance. The width
+     already carries the information; a colour per field would only decorate. */
+  .seg:nth-child(odd)  { background: color-mix(in srgb, var(--accent) 62%, var(--plate)); }
+  .seg:nth-child(even) { background: color-mix(in srgb, var(--accent) 38%, var(--plate)); }
+
+  .legend {
+    display: flex;
+    margin-top: 0.5rem;
+    font-size: 0.8rem;
+    color: var(--muted);
+  }
+
+  /* A field can cost a twentieth of a bit, and a label that narrow would sit
+     on top of its neighbour. Those are named in the line underneath instead. */
+  .legend span {
+    min-width: 0;
+    padding-right: 0.5rem;
+    white-space: nowrap;
+    overflow: hidden;
+  }
+
+  .legend span:last-child { padding-right: 0; text-align: right; }
+
+  .legend b {
+    display: block;
+    font-family: var(--mono);
+    font-weight: 500;
+    color: var(--ink);
+    font-size: 0.85rem;
+  }
+
+  .tiny {
+    margin: 0.5rem 0 0;
+    font-size: 0.82rem;
+    color: var(--muted);
+  }
+
+  .tiny code { font-family: var(--mono); color: var(--ink); }
+
+  .empty {
+    height: 2.75rem;
+    border: 1px dashed var(--rule);
+    border-radius: 1px;
+    display: flex;
+    align-items: center;
+    padding: 0 0.9rem;
+    color: var(--muted);
+    font-size: 0.9rem;
+  }
+
+  /* --- the result -------------------------------------------------------- */
+
+  .result {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 2rem;
+    align-items: start;
+    margin-top: 2.5rem;
+    padding-top: 2rem;
+    border-top: 1px solid var(--rule);
+  }
+
+  .link {
+    font-family: var(--mono);
+    font-size: clamp(1rem, 2.6vw, 1.35rem);
+    line-height: 1.35;
+    overflow-wrap: anywhere;
+    margin: 0 0 0.9rem;
+  }
+
+  .link .host { color: var(--muted); }
+  .link .payload { color: var(--accent); font-weight: 600; }
+
+  .stats {
+    margin: 0;
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 0.15rem 1rem;
+    font-size: 0.9rem;
+  }
+
+  .stats dt { color: var(--muted); }
+  .stats dd { margin: 0; font-family: var(--mono); }
+  .stats dd.grew { color: var(--warn); }
+
+  button {
+    margin-top: 1.25rem;
+    padding: 0.55rem 1.1rem;
+    border: 1px solid var(--ink);
+    border-radius: 2px;
+    background: var(--ink);
+    color: var(--paper);
+    font: inherit;
+    font-size: 0.95rem;
+    cursor: pointer;
+  }
+
+  button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  button[disabled] { opacity: 0.4; cursor: default; }
+
+  /* The QR always sits on white: a scanner needs the contrast, whatever the
+     rest of the page is doing. */
+  .code {
+    background: #fff;
+    padding: 0.5rem;
+    border: 1px solid var(--rule);
+    border-radius: 2px;
+    line-height: 0;
+  }
+
+  .code svg { width: 11.5rem; height: 11.5rem; display: block; }
+
+  .note {
+    margin: 0.6rem 0 0;
+    font-size: 0.8rem;
+    color: var(--muted);
+    max-width: 11.5rem;
+  }
+
+  .error {
+    margin-top: 2rem;
+    padding: 0.9rem 1rem;
+    border-left: 3px solid var(--warn);
+    background: var(--plate);
+    color: var(--ink);
+    font-size: 0.95rem;
+  }
+
+  /* --- explanation ------------------------------------------------------- */
+
+  .about {
+    margin-top: 4rem;
+    padding-top: 2rem;
+    border-top: 2px solid var(--ink);
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+    gap: 2rem 3rem;
+  }
+
+  .about h2 {
+    font-size: 1rem;
+    margin: 0 0 0.5rem;
+    letter-spacing: -0.01em;
+  }
+
+  .about p { margin: 0 0 0.75rem; color: var(--muted); font-size: 0.92rem; max-width: 34rem; }
+  .about code { font-family: var(--mono); font-size: 0.88em; color: var(--ink); }
+  .about a { color: var(--accent); }
+
+  @media (max-width: 46rem) {
+    .result { grid-template-columns: minmax(0, 1fr); }
+    header { flex-direction: column; align-items: flex-start; gap: 0.5rem; }
+    header p { text-align: left; }
+    .legend { font-size: 0.72rem; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .seg { transition: none; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <h1>squrl</h1>
+    <p>A URL compressor whose output is still a link. The address rides inside
+       it, so nothing is stored anywhere.</p>
+  </header>
+
+  <div class="field">
+    <label for="url">Paste a link</label>
+    <textarea id="url" spellcheck="false" autocapitalize="off" autocorrect="off"
+      placeholder="https://www.youtube.com/watch?v=dQw4w9WgXcQ&amp;t=42s"></textarea>
+    <div class="options">
+      <label><input type="checkbox" id="hash"> Keep the destination out of the request</label>
+      <label><input type="checkbox" id="strip"> Drop tracking parameters</label>
+    </div>
+  </div>
+
+  <section class="ruler" aria-live="polite">
+    <div id="bar" class="empty">Nothing measured yet.</div>
+    <div id="legend" class="legend" hidden></div>
+    <p id="tiny" class="tiny" hidden></p>
+  </section>
+
+  <section id="result" class="result" hidden>
+    <div>
+      <p class="link" id="link"></p>
+      <dl class="stats" id="stats"></dl>
+      <button id="copy" type="button">Copy link</button>
+    </div>
+    <div>
+      <div class="code" id="code"></div>
+      <p class="note" id="qrnote"></p>
+    </div>
+  </section>
+
+  <div id="error" class="error" hidden></div>
+
+  <section class="about">
+    <div>
+      <h2>Why the link is not in a database</h2>
+      <p>A shortener stores your URL and hands you a receipt. squrl compresses
+         the URL <em>into</em> the link, so nothing expires, the same address
+         always gives the same link, and anyone running this code can expand
+         one — offline.</p>
+      <p>What you see above happened in this tab. No request was made.</p>
+    </div>
+    <div>
+      <h2>Where the bits go</h2>
+      <p>Two schemes are worth having, so <code>https://</code> is one bit —
+         and once the model knows most links use it, that bit costs about a
+         twentieth of one. Hostnames come from a dictionary, path words from
+         another. What is left is the genuinely random part, and that is all
+         the ruler is really measuring.</p>
+    </div>
+    <div>
+      <h2>Opening one still needs a hop</h2>
+      <p>A phone camera reads URLs; it cannot decompress one. Something has to
+         turn the payload back into an address — this page, served for any path
+         by the same static hosting, or the redirector in
+         <code>server/</code>. Neither stores anything.</p>
+      <p><a href="https://github.com/AlexMelanFromRingo/squrl">Source and the
+         long explanation</a></p>
+    </div>
+  </section>
+
+</div>
+
+<script type="module">
+import { shorten, DEFAULT_BASE } from './src/codec.js';
+import { encode, toSvg } from './src/qr.js';
+import { strip } from './src/tracking.js';
+
+// A link can also carry its payload in the fragment -- `sq.gy/#PAYLOAD` --
+// which is never sent to the server at all. Static hosting answers that with
+// this page rather than 404.html, so the opening happens here.
+const fragment = location.hash.slice(1).trim();
+if (/^[0-9a-zA-Z]+$/.test(fragment)) {
+  const { expand } = await import('./src/codec.js');
+  const { followable } = await import('./src/safe.js');
+  try {
+    const target = expand(fragment);
+    document.querySelector('.wrap').innerHTML =
+      `<h1 style="font-size:1.05rem;color:var(--muted);margin:0 0 1rem">Opening</h1>` +
+      `<a class="url" href="${target.replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`)}"` +
+      ` rel="noreferrer" style="display:block;padding:.9rem 1rem;border:1px solid var(--rule);` +
+      `border-left:3px solid var(--accent);background:var(--plate);font-family:var(--mono);` +
+      `color:var(--ink);text-decoration:none;overflow-wrap:anywhere">` +
+      `${target.replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`)}</a>`;
+    if (followable(target)) location.replace(target);
+  } catch (err) {
+    document.querySelector('.wrap').innerHTML =
+      `<p>Cannot decode that link: ${err.message.replace(/[&<>"]/g, '')}</p>`;
+  }
+}
+
+const input = document.querySelector('#url');
+const hashMode = document.querySelector('#hash');
+const stripMode = document.querySelector('#strip');
+const bar = document.querySelector('#bar');
+const legend = document.querySelector('#legend');
+const tiny = document.querySelector('#tiny');
+const result = document.querySelector('#result');
+const linkEl = document.querySelector('#link');
+const statsEl = document.querySelector('#stats');
+const codeEl = document.querySelector('#code');
+const qrNote = document.querySelector('#qrnote');
+const copyButton = document.querySelector('#copy');
+const errorEl = document.querySelector('#error');
+
+// Links are built against wherever this page is served from, so the ones it
+// makes actually work. Falling back to the project's own base keeps the
+// examples sensible when the page is opened from a file.
+const base = location.protocol.startsWith('http')
+  ? `${location.origin}${location.pathname.replace(/[^/]*$/, '')}`
+  : DEFAULT_BASE;
+
+const FIELDS = ['scheme', 'host', 'path', 'query', 'fragment', 'raw'];
+
+let current = '';
+
+function reset(message) {
+  bar.className = 'empty';
+  bar.textContent = message;
+  legend.hidden = true;
+  tiny.hidden = true;
+  result.hidden = true;
+  current = '';
+}
+
+// Labels need room. Below this share of the bar there is none, and the field
+// gets named in a sentence instead -- which is the more interesting half of
+// the story anyway: those are the parts the model guessed almost exactly.
+const LABEL_THRESHOLD = 0.06;
+
+function drawRuler(cost) {
+  const entries = FIELDS
+    .map((field) => [field, cost.get(field) ?? 0])
+    .filter(([, bits]) => bits > 0.001);
+  const total = entries.reduce((sum, [, bits]) => sum + bits, 0);
+
+  bar.className = 'bar';
+  bar.innerHTML = '';
+  legend.innerHTML = '';
+  legend.hidden = false;
+
+  const unlabelled = [];
+
+  for (const [field, bits] of entries) {
+    const share = bits / total;
+    const basis = `${share} 1 ${(share * 100).toFixed(2)}%`;
+
+    const segment = document.createElement('div');
+    segment.className = 'seg';
+    segment.dataset.field = field;
+    segment.style.flex = basis;
+    segment.title = `${field}: ${bits.toFixed(2)} bits`;
+    bar.append(segment);
+
+    const label = document.createElement('span');
+    label.style.flex = basis;
+    if (share >= LABEL_THRESHOLD) {
+      label.innerHTML = `${field}<b>${bits < 1 ? bits.toFixed(2) : bits.toFixed(1)}</b>`;
+    } else {
+      unlabelled.push([field, bits]);
+    }
+    legend.append(label);
+  }
+
+  if (unlabelled.length) {
+    tiny.hidden = false;
+    tiny.innerHTML = `Too narrow to draw: ${unlabelled
+      .map(([field, bits]) => `<code>${field}</code> ${bits.toFixed(2)}`)
+      .join(', ')} bits. The model had those almost exactly right.`;
+  } else {
+    tiny.hidden = true;
+  }
+}
+
+function render() {
+  const raw = input.value.trim();
+  errorEl.hidden = true;
+
+  if (!raw) {
+    reset('Nothing measured yet.');
+    return;
+  }
+
+  let url = raw;
+  let dropped = [];
+  if (stripMode.checked) {
+    const cleaned = strip(url);
+    url = cleaned.url;
+    dropped = cleaned.removed;
+  }
+
+  let packed;
+  try {
+    packed = shorten(url, { base });
+  } catch (err) {
+    reset('Nothing measured yet.');
+    errorEl.hidden = false;
+    errorEl.textContent = `That could not be compressed: ${err.message}`;
+    return;
+  }
+
+  const link = hashMode.checked ? `${base}#${packed.payload}` : packed.link;
+  current = link;
+
+  drawRuler(packed.cost);
+
+  linkEl.innerHTML = '';
+  const host = document.createElement('span');
+  host.className = 'host';
+  host.textContent = link.slice(0, link.length - packed.payload.length);
+  const payload = document.createElement('span');
+  payload.className = 'payload';
+  payload.textContent = packed.payload;
+  linkEl.append(host, payload);
+
+  // A QR code has a mode for digits and capitals that costs 5.5 bits per
+  // character instead of 8 -- but only if every character is in it.
+  const forQr = link.toUpperCase();
+  const symbol = encode(forQr, { level: 'L' });
+  const before = encode(url, { level: 'L' });
+
+  codeEl.innerHTML = toSvg(symbol, { scale: 8, quiet: 3 });
+
+  const grew = link.length > url.length;
+  statsEl.innerHTML = '';
+  const rows = [
+    ['Characters', `${link.length}, was ${url.length}`, grew],
+    ['Payload', `${packed.bytes.length} bytes`, false],
+    ['QR modules', `${symbol.size}x${symbol.size}, was ${before.size}x${before.size}`,
+      symbol.size > before.size],
+  ];
+  if (dropped.length) rows.push(['Dropped', `${dropped.length} tracking parameter(s)`, false]);
+
+  for (const [term, value, warn] of rows) {
+    const dt = document.createElement('dt');
+    dt.textContent = term;
+    const dd = document.createElement('dd');
+    dd.textContent = value;
+    if (warn) dd.className = 'grew';
+    statsEl.append(dt, dd);
+  }
+
+  qrNote.textContent = symbol.mode === 'alnum'
+    ? `Version ${symbol.version}, alphanumeric mode — the cheap one.`
+    : `Version ${symbol.version}, byte mode: a character outside 0-9 A-Z costs the QR 45% more per character.`;
+
+  result.hidden = false;
+  copyButton.textContent = 'Copy link';
+}
+
+copyButton.addEventListener('click', async () => {
+  try {
+    await navigator.clipboard.writeText(current);
+    copyButton.textContent = 'Copied';
+  } catch {
+    // Clipboard access can be refused; selecting the text still works.
+    copyButton.textContent = 'Select it and copy';
+  }
+});
+
+for (const element of [input, hashMode, stripMode]) {
+  element.addEventListener('input', render);
+}
+
+// Start with something worth looking at.
+input.value = 'https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=42s';
+render();
+</script>
+</body>
+</html>

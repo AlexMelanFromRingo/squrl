@@ -16,6 +16,7 @@
 // host -- which is why the whole thing fits in one file with no dependencies.
 
 import { expand } from '../src/codec.js';
+import { followable, asciiUrl } from '../src/safe.js';
 
 // A payload longer than this is not a URL anyone shortened; it is someone
 // probing. Base36 of a 4 kB URL would still be well under this.
@@ -32,35 +33,6 @@ const SECURITY = {
 const escape = (text) => String(text).replace(/[&<>"']/g, (c) => (
   { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
 ));
-
-/**
- * What may go in a Location header.
- *
- * Two hazards, both real. A redirect to `javascript:` or `data:` from a domain
- * someone trusts is a favour an open redirector should refuse -- hence http
- * and https only. And a decoded string may contain anything at all: fuzzing
- * this service turned up a random payload that decoded to a URL with a newline
- * in it, which as a Location header is header injection. Whitespace and
- * control characters are rejected outright rather than escaped.
- */
-const FOLLOWABLE = new RegExp('^https?://[^\\s\\u0000-\\u001f\\u007f]+$', 'i');
-
-/**
- * Make a decoded URL safe to put in a header.
- *
- * A URL may legitimately contain raw non-ASCII -- `/файл.pdf` is a real path,
- * and the compressor preserves it exactly. HTTP headers are Latin-1, so those
- * characters travel as percent-encoded UTF-8, which is what a browser sends
- * for the same address. Control characters never reach here: FOLLOWABLE has
- * already refused them.
- */
-const encoder = new TextEncoder();
-
-function asciiLocation(url) {
-  return url.replace(/[^\u0020-\u007e]/gu, (ch) => [...encoder.encode(ch)]
-    .map((byte) => `%${byte.toString(16).toUpperCase().padStart(2, '0')}`)
-    .join(''));
-}
 
 function page(title, body, status = 200) {
   return {
@@ -127,15 +99,15 @@ export function handle(url) {
       `<p class="muted">${escape(err.message)}</p>`, 400);
   }
 
-  const followable = FOLLOWABLE.test(target);
-  const preview = url.searchParams.has('preview') || !followable;
+  const canFollow = followable(target);
+  const preview = url.searchParams.has('preview') || !canFollow;
 
   if (preview) {
     return page(
-      followable ? 'Preview' : 'Not a web address',
-      `<h1>${followable ? 'This link goes to' : 'This link is not a web address'}</h1>` +
+      canFollow ? 'Preview' : 'Not a web address',
+      `<h1>${canFollow ? 'This link goes to' : 'This link is not a web address'}</h1>` +
       `<span class="url">${escape(target)}</span>` +
-      (followable
+      (canFollow
         ? `<p><a href="${escape(target)}" rel="noreferrer">Go there</a></p>`
         : '<p class="muted">Only http and https links are opened automatically.</p>'),
     );
@@ -145,7 +117,7 @@ export function handle(url) {
   // decision: this payload has always meant this URL and always will.
   return {
     status: 301,
-    headers: { location: asciiLocation(target), 'cache-control': CACHE, ...SECURITY },
+    headers: { location: asciiUrl(target), 'cache-control': CACHE, ...SECURITY },
     body: '',
   };
 }

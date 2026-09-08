@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Opening a squrl link</title>
+<meta name="robots" content="noindex">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='14' font-size='14'>🐿️</text></svg>">
+<style>
+  :root {
+    --paper: #edf0ec;
+    --plate: #f7f9f6;
+    --ink: #16232b;
+    --muted: #5f6e6a;
+    --rule: #c9d2cb;
+    --accent: #2438c8;
+    --warn: #8a4b12;
+    --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --mono: ui-monospace, "SF Mono", "Cascadia Mono", "Roboto Mono", Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #101718; --plate: #172021; --ink: #e7ece8;
+      --muted: #93a29d; --rule: #2e3a3a; --accent: #8b9bff; --warn: #d9955a;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.5rem;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--sans);
+    line-height: 1.5;
+  }
+  main { max-width: 34rem; width: 100%; }
+  h1 {
+    margin: 0 0 1rem;
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: var(--muted);
+  }
+  .url {
+    display: block;
+    padding: 0.9rem 1rem;
+    border: 1px solid var(--rule);
+    border-left: 3px solid var(--accent);
+    border-radius: 2px;
+    background: var(--plate);
+    font-family: var(--mono);
+    font-size: 1rem;
+    overflow-wrap: anywhere;
+    color: var(--ink);
+    text-decoration: none;
+  }
+  a.url:hover { border-left-color: var(--ink); }
+  p { color: var(--muted); font-size: 0.9rem; margin: 1rem 0 0; }
+  p a { color: var(--accent); }
+  .bad { border-left-color: var(--warn); font-family: var(--sans); }
+</style>
+</head>
+<body>
+<main id="out">
+  <h1>Opening a squrl link…</h1>
+</main>
+
+<script type="module">
+// This page is what a static host serves for a path it does not have, which
+// is every squrl link. It decompresses the payload here, in the tab, and goes
+// where it says -- so the whole redirector is a file, not a server.
+//
+// The payload can arrive two ways:
+//
+//   /3FW1PKGIWMQCIJRGQTZ697DAN   in the path; the host sees it in the request
+//   #3FW1PKGIWMQCIJRGQTZ697DAN   in the fragment, which is never sent at all
+//
+// The fragment form is the private one. It costs a bigger QR code, because
+// `#` is not in the character set QR codes have a cheap mode for.
+
+const out = document.getElementById('out');
+
+function show(heading, body, bad = false) {
+  out.innerHTML = '';
+  const title = document.createElement('h1');
+  title.textContent = heading;
+  out.append(title);
+  if (body) out.append(body);
+  if (bad) body?.classList.add('bad');
+}
+
+function message(text) {
+  const el = document.createElement('div');
+  el.className = 'url';
+  el.textContent = text;
+  return el;
+}
+
+function footnote(html) {
+  const p = document.createElement('p');
+  p.innerHTML = html;
+  out.append(p);
+}
+
+const segments = location.pathname.split('/').filter(Boolean);
+const payload = (location.hash.slice(1) || segments.pop() || '').trim();
+// Whatever is left of the path is where this deployment lives, which is also
+// where the decoder next to this file is.
+const root = `${location.origin}/${segments.length ? `${segments.join('/')}/` : ''}`;
+
+if (!payload) {
+  show('No link here', message('Add a payload to the address to open one.'), true);
+  footnote(`<a href="${root}">Compress a link instead</a>`);
+} else if (!/^[0-9a-zA-Z]+$/.test(payload)) {
+  show('Not a squrl link', message('Payloads are digits and letters only.'), true);
+  footnote(`<a href="${root}">Compress a link instead</a>`);
+} else {
+  try {
+    const [{ expand }, { followable }] = await Promise.all([
+      import(new URL('src/codec.js', root).href),
+      import(new URL('src/safe.js', root).href),
+    ]);
+
+    const target = expand(payload);
+
+    if (!followable(target)) {
+      // Only http and https are opened without asking. Anything else -- a
+      // mailto:, or a payload that decoded to something that is not a web
+      // address at all -- is shown and left to the reader.
+      show('This link is not a web address', message(target), true);
+      footnote('Only http and https links are opened automatically.');
+    } else {
+      const link = document.createElement('a');
+      link.className = 'url';
+      link.href = target;
+      link.rel = 'noreferrer';
+      link.textContent = target;
+      show('Opening', link);
+      footnote('If nothing happens, use the link above.');
+      location.replace(target);
+    }
+  } catch (err) {
+    show('Cannot decode that link', message(err.message), true);
+    footnote(`It may be a typo, or made with a different version of the format.
+      <a href="${root}">Compress a link instead</a>`);
+  }
+}
+</script>
+</body>
+</html>
